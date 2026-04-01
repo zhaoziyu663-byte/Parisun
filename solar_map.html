@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🌍 全球昼夜实时地图</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; background: #0a0a1a; overflow: hidden; }
+        #map { width: 100%; height: calc(100vh - 130px); }
+
+        #panel {
+            height: 130px;
+            background: linear-gradient(180deg, #1a1a3e, #0f0f2a);
+            padding: 10px 20px;
+            color: #fff;
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            gap: 8px;
+            border-top: 2px solid #e94560;
+        }
+        .info-row {
+            display: flex; align-items: center;
+            gap: 12px; flex-wrap: wrap; justify-content: center;
+        }
+        .badge {
+            padding: 4px 14px; border-radius: 20px;
+            font-size: 12px; font-weight: bold;
+        }
+        .badge-live {
+            background: #e94560; color: #fff;
+            animation: pulse 2s infinite;
+        }
+        .badge-manual { background: #ffc107; color: #333; animation: none; }
+        @keyframes pulse { 0%,100%{ opacity:1 } 50%{ opacity:.55 } }
+
+        .time-chip {
+            background: rgba(255,255,255,.08);
+            padding: 5px 12px; border-radius: 8px;
+            font-size: 13px; font-variant-numeric: tabular-nums;
+        }
+        .time-chip .city { color: #aaa; font-size: 11px; margin-right: 4px; }
+        .time-chip .clock { color: #fff; font-weight: bold; }
+
+        .slider-row { display: flex; align-items: center; gap: 10px; }
+        #time-slider {
+            width: min(500px, 55vw);
+            accent-color: #e94560;
+            cursor: grab;
+        }
+        #time-slider:active { cursor: grabbing; }
+        .hint { color: #666; font-size: 11px; }
+
+        @media (max-width: 600px) {
+            #panel { height: auto; padding: 8px 10px; }
+            #map { height: calc(100vh - 150px); }
+            .time-chip { font-size: 11px; padding: 3px 8px; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div id="panel">
+    <div class="info-row">
+        <span id="badge" class="badge badge-live">● 实时</span>
+        <div class="time-chip">
+            <span class="city">🌐 UTC</span>
+            <span class="clock" id="t-utc">--:--:--</span>
+        </div>
+        <div class="time-chip">
+            <span class="city">🗼 巴黎</span>
+            <span class="clock" id="t-paris">--:--:--</span>
+        </div>
+        <div class="time-chip">
+            <span class="city">🏯 南京</span>
+            <span class="clock" id="t-nanjing">--:--:--</span>
+        </div>
+    </div>
+    <div class="slider-row">
+        <span class="hint">00:00</span>
+        <input type="range" id="time-slider" min="0" max="23" step="1" value="12" />
+        <span class="hint">23:00</span>
+    </div>
+    <div class="hint" id="status">拖动滑块浏览当天各时刻 · 松开自动恢复实时</div>
+</div>
+
+<!-- ====== 外部库（CDN，需联网） ====== -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@joergdietrich/leaflet.terminator@latest/L.Terminator.js"></script>
+
+<script>
+(function () {
+    'use strict';
+
+    /* ===== 1. 地图初始化 ===== */
+    const map = L.map('map', {
+        center: [25, 50], zoom: 2,
+        minZoom: 2, maxZoom: 12,
+        worldCopyJump: true
+    });
+
+    const imagery = L.tileLayer(
+        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        { attribution: '© Esri, USGS, NOAA' }
+    );
+    const osm = L.tileLayer(
+        'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        { attribution: '© OpenStreetMap' }
+    );
+    imagery.addTo(map);
+    L.control.layers({ '🛰️ 卫星': imagery, '🗺️ 街道': osm }).addTo(map);
+
+    /* ===== 2. 经纬网格 ===== */
+    const gridOpt = { color: 'rgba(255,255,255,0.15)', weight: 0.5, interactive: false };
+    for (let lat = -60; lat <= 60; lat += 30)
+        L.polyline([[lat, -180], [lat, 180]], gridOpt).addTo(map);
+    for (let lng = -180; lng <= 180; lng += 60)
+        L.polyline([[-85, lng], [85, lng]], gridOpt).addTo(map);
+
+    /* ===== 3. 城市标注 ===== */
+    const cities = [
+        { name: '巴黎 Paris',   lat: 48.8566, lng:   2.3522, tz: 'Europe/Paris'  },
+        { name: '南京 Nanjing',  lat: 32.0603, lng: 118.7969, tz: 'Asia/Shanghai' }
+    ];
+    cities.forEach(c => {
+        L.circleMarker([c.lat, c.lng], {
+            radius: 6, color: '#fff', weight: 2,
+            fillColor: '#e94560', fillOpacity: 1
+        }).addTo(map)
+         .bindPopup(`<b>${c.name}</b><br>${c.lat}°N, ${c.lng}°E`);
+
+        L.marker([c.lat, c.lng], {
+            interactive: false,
+            icon: L.divIcon({
+                className: '',
+                html: `<span style="color:#fff;font-size:12px;font-weight:bold;
+                        text-shadow:0 0 6px #000,0 0 3px #000;
+                        white-space:nowrap">${c.name}</span>`,
+                iconAnchor: [-10, 12]
+            })
+        }).addTo(map);
+    });
+
+    /* ===== 4. 昼夜阴影 ===== */
+    let tLayer = null;
+
+    function drawTerminator(date) {
+        if (typeof L.terminator !== 'function') return;
+        if (tLayer) map.removeLayer(tLayer);
+        tLayer = L.terminator({
+            time: date,
+            fillOpacity: 0.42,
+            fillColor: '#000011',
+            color: '#ff8c00',
+            weight: 1.5
+        }).addTo(map);
+    }
+
+    /* ===== 5. 时间显示 ===== */
+    const pad = n => String(n).padStart(2, '0');
+
+    function fmtUTC(d) {
+        return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ` +
+               `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
+    }
+
+    function fmtTZ(d, tz) {
+        try {
+            return d.toLocaleString('zh-CN', {
+                timeZone: tz, hour12: false,
+                month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit', second: '2-digit'
+            });
+        } catch (e) { return '--'; }
+    }
+
+    function showTime(d) {
+        document.getElementById('t-utc').textContent     = fmtUTC(d);
+        document.getElementById('t-paris').textContent    = fmtTZ(d, 'Europe/Paris');
+        document.getElementById('t-nanjing').textContent  = fmtTZ(d, 'Asia/Shanghai');
+    }
+
+    /* ===== 6. 滑块交互 ===== */
+    const slider = document.getElementById('time-slider');
+    const badge  = document.getElementById('badge');
+    const status = document.getElementById('status');
+    let dragging = false;
+
+    function goLive() {
+        dragging = false;
+        badge.textContent = '● 实时';
+        badge.className   = 'badge badge-live';
+        status.textContent = '拖动滑块浏览当天各时刻 · 松开自动恢复实时';
+        tick();
+    }
+
+    // 开始拖动
+    slider.addEventListener('mousedown',  () => { dragging = true; });
+    slider.addEventListener('touchstart', () => { dragging = true; }, { passive: true });
+
+    // 拖动中
+    slider.addEventListener('input', () => {
+        dragging = true;
+        badge.textContent = '⏸ 手动';
+        badge.className   = 'badge badge-manual';
+
+        const h   = parseInt(slider.value);
+        const now = new Date();
+        const sim = new Date(Date.UTC(
+            now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), h, 0, 0
+        ));
+        drawTerminator(sim);
+        showTime(sim);
+        status.textContent = `预览: UTC ${pad(h)}:00 — 松开恢复实时`;
+    });
+
+    // 松开 → 恢复实时（挂在 document 上，防止滑出元素后丢失事件）
+    document.addEventListener('mouseup',  () => { if (dragging) goLive(); });
+    document.addEventListener('touchend', () => { if (dragging) goLive(); });
+
+    /* ===== 7. 定时刷新 ===== */
+    function tick() {
+        if (!dragging) {
+            const now = new Date();
+            drawTerminator(now);
+            showTime(now);
+            slider.value = now.getUTCHours();
+        }
+    }
+
+    tick();                       // 首次渲染
+    setInterval(tick, 10000);     // 每 10 秒刷新
+
+    /* ===== 8. 插件加载检查 ===== */
+    if (typeof L.terminator !== 'function') {
+        status.textContent = '⚠️ 昼夜阴影插件加载失败，请检查网络';
+        status.style.color = '#e94560';
+    }
+
+})();
+</script>
+</body>
+</html>
