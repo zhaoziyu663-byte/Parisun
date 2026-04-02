@@ -4,59 +4,121 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Parîsun</title>
-    <link rel="icon" href="/logo.svg" type="image/x-icon">
+
+    <!-- ✅ 修复1: favicon 用 data URI 内嵌太阳SVG，无需外部文件 -->
+    <link rel="icon" type="image/svg+xml"
+          href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='18' fill='%23FFD700'/><g stroke='%23FFD700' stroke-width='4' stroke-linecap='round'><line x1='50' y1='6' x2='50' y2='22'/><line x1='50' y1='78' x2='50' y2='94'/><line x1='6' y1='50' x2='22' y2='50'/><line x1='78' y1='50' x2='94' y2='50'/><line x1='19' y1='19' x2='30' y2='30'/><line x1='70' y1='70' x2='81' y2='81'/><line x1='81' y1='19' x2='70' y2='30'/><line x1='30' y1='70' x2='19' y2='81'/></g></svg>">
+
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; background: #0a0a1a; overflow: hidden; }
         #map { width: 100%; height: calc(100vh - 130px); }
 
+        /* ====== 底部面板 ====== */
         #panel {
             height: 130px;
             background: linear-gradient(180deg, #1a1a3e, #0f0f2a);
-            padding: 10px 20px;
-            color: #fff;
+            padding: 10px 20px; color: #fff;
             display: flex; flex-direction: column;
-            justify-content: center; align-items: center;
-            gap: 8px;
+            justify-content: center; align-items: center; gap: 8px;
             border-top: 2px solid #e94560;
         }
-        .info-row {
-            display: flex; align-items: center;
-            gap: 12px; flex-wrap: wrap; justify-content: center;
-        }
-        .badge {
-            padding: 4px 14px; border-radius: 20px;
-            font-size: 12px; font-weight: bold;
-        }
-        .badge-live {
-            background: #e94560; color: #fff;
-            animation: pulse 2s infinite;
-        }
+        .info-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: center; }
+        .badge { padding: 4px 14px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+        .badge-live { background: #e94560; color: #fff; animation: pulse 2s infinite; }
         .badge-manual { background: #ffc107; color: #333; animation: none; }
         @keyframes pulse { 0%,100%{ opacity:1 } 50%{ opacity:.55 } }
-
-        .time-chip {
-            background: rgba(255,255,255,.08);
-            padding: 5px 12px; border-radius: 8px;
-            font-size: 13px; font-variant-numeric: tabular-nums;
-        }
+        .time-chip { background: rgba(255,255,255,.08); padding: 5px 12px; border-radius: 8px; font-size: 13px; font-variant-numeric: tabular-nums; }
         .time-chip .city { color: #aaa; font-size: 11px; margin-right: 4px; }
         .time-chip .clock { color: #fff; font-weight: bold; }
-
         .slider-row { display: flex; align-items: center; gap: 10px; }
-        #time-slider {
-            width: min(500px, 55vw);
-            accent-color: #e94560;
-            cursor: grab;
-        }
+        #time-slider { width: min(500px, 55vw); accent-color: #e94560; cursor: grab; }
         #time-slider:active { cursor: grabbing; }
         .hint { color: #666; font-size: 11px; }
+
+        /* ====== 💌 留言板按钮 ====== */
+        #msg-toggle {
+    position: fixed; bottom: 150px; right: 18px;
+    width: 52px; height: 52px; border-radius: 50%;
+    background: linear-gradient(135deg, rgba(233,69,96,0.5), rgba(199,54,89,0.5));
+    border: 2px solid rgba(255,255,255,0.15);
+    color: #fff; font-size: 24px; cursor: pointer;
+    z-index: 2000;
+    box-shadow: 0 4px 20px rgba(233,69,96,0.45);
+    transition: transform .2s, box-shadow .2s;
+}
+        #msg-toggle:hover { transform: scale(1.12); box-shadow: 0 6px 28px rgba(233,69,96,0.6); }
+
+        /* ====== 💌 留言板面板 ====== */
+        #msg-panel {
+            display: none; flex-direction: column;
+            position: fixed; bottom: 150px; right: 18px;
+            width: 300px; max-height: 420px;
+            background: rgba(12, 12, 36, 0.97);
+            border: 1px solid rgba(233,69,96,0.35);
+            border-radius: 16px; z-index: 2001;
+            overflow: hidden;
+            box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+            backdrop-filter: blur(12px);
+        }
+        .msg-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,0.08);
+            font-size: 15px; font-weight: bold; color: #fff;
+        }
+        .msg-close { background: none; border: none; color: #666; font-size: 22px; cursor: pointer; line-height: 1; }
+        .msg-close:hover { color: #e94560; }
+        .msg-body { padding: 14px 16px; flex: 1; overflow-y: auto; }
+        .msg-card { margin-bottom: 16px; }
+        .msg-city { font-size: 12px; color: #888; margin-bottom: 3px; }
+        .msg-text { font-size: 15px; color: #eee; line-height: 1.5; font-style: italic; }
+        .msg-text::before { content: '"'; color: #e94560; }
+        .msg-text::after  { content: '"'; color: #e94560; }
+        .msg-time { font-size: 11px; color: #555; text-align: right; margin-top: 4px; }
+        .msg-divider { border: none; border-top: 1px solid rgba(255,255,255,0.06); margin: 0; }
+        .msg-footer { padding: 12px 16px 16px; border-top: 1px solid rgba(255,255,255,0.08); }
+        .msg-footer select {
+            width: 100%; padding: 7px 10px; margin-bottom: 8px;
+            background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 8px; color: #fff; font-size: 13px; outline: none;
+        }
+        .msg-footer select option { background: #1a1a3e; }
+        .msg-input-row { display: flex; gap: 8px; }
+        .msg-input-row input {
+            flex: 1; padding: 9px 12px;
+            background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 10px; color: #fff; font-size: 13px; outline: none;
+        }
+        .msg-input-row input:focus { border-color: #e94560; }
+        .msg-input-row input::placeholder { color: #555; }
+        .msg-input-row button {
+            padding: 9px 16px; background: #e94560; border: none;
+            border-radius: 10px; color: #fff; font-weight: bold; font-size: 14px; cursor: pointer;
+            transition: background .2s;
+        }
+        .msg-input-row button:hover { background: #c73659; }
+        .msg-hint-box {
+            padding: 24px 16px; text-align: center;
+            color: #888; font-size: 13px; line-height: 1.8;
+        }
+        .msg-hint-box code { background: rgba(255,255,255,0.08); padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+
+        /* ====== 同一天指示器 ====== */
+        #day-indicator {
+            font-size: 11px; padding: 3px 10px;
+            border-radius: 12px; font-weight: bold;
+        }
+        .same-day { background: rgba(255,215,0,0.15); color: #FFD700; }
+        .diff-day { background: rgba(138,43,226,0.15); color: #B388FF; }
 
         @media (max-width: 600px) {
             #panel { height: auto; padding: 8px 10px; }
             #map { height: calc(100vh - 150px); }
             .time-chip { font-size: 11px; padding: 3px 8px; }
+            #msg-panel { width: calc(100vw - 32px); right: 16px; }
+            #msg-toggle { bottom: 155px; }
+            #msg-panel { bottom: 155px; }
         }
     </style>
 </head>
@@ -64,9 +126,51 @@
 
 <div id="map"></div>
 
+<!-- ====== 留言板按钮 ====== -->
+<button id="msg-toggle">🔞</button>
+
+<!-- ====== 留言板面板 ====== -->
+<div id="msg-panel">
+    <div class="msg-header">
+        <span>此刻 · en ce moment</span>
+        <button class="msg-close" id="msg-close">×</button>
+    </div>
+    <div class="msg-body" id="msg-body">
+        <div class="msg-card">
+            <div class="msg-city">🗼 巴黎 Paris</div>
+            <div class="msg-text" id="paris-msg">暂无留言</div>
+            <div class="msg-time" id="paris-msg-time"></div>
+        </div>
+        <hr class="msg-divider">
+        <div class="msg-card" style="margin-top:14px">
+            <div class="msg-city">🏯 南京 Nanjing</div>
+            <div class="msg-text" id="nanjing-msg">暂无留言</div>
+            <div class="msg-time" id="nanjing-msg-time"></div>
+        </div>
+    </div>
+    <div class="msg-footer" id="msg-footer">
+        <select id="msg-who">
+            <option value="paris">🗼 我在巴黎</option>
+            <option value="nanjing">🏯 我在南京</option>
+        </select>
+        <div class="msg-input-row">
+            <input type="text" id="msg-input" placeholder="此刻在做什么…" maxlength="120">
+            <button id="msg-send">发!</button>
+        </div>
+    </div>
+    <div class="msg-hint-box" id="msg-hint" style="display:none">
+        ⚠️ 留言板需配置 Firebase<br>
+        打开 <code>index.html</code> 搜索<br>
+        <code>firebaseConfig</code> 并替换配置<br>
+        <small style="color:#555">详见 README</small>
+    </div>
+</div>
+
+<!-- ====== 底部时间面板 ====== -->
 <div id="panel">
     <div class="info-row">
         <span id="badge" class="badge badge-live">● 实时</span>
+        <span id="day-indicator" class="same-day">☀️ 同一天</span>
         <div class="time-chip">
             <span class="city">🌐 UTC</span>
             <span class="clock" id="t-utc">--:--:--</span>
@@ -85,20 +189,38 @@
         <input type="range" id="time-slider" min="0" max="23" step="1" value="12" />
         <span class="hint">23:00</span>
     </div>
-    <div class="hint" id="status">拖动滑块浏览当天各时刻 · 松开自动恢复实时</div>
+    <div class="hint" id="status">Faites glisser le curseur pour parcourir les différentes heures de la journée.</div>
 </div>
 
-<!-- ====== 外部库（CDN，需联网） ====== -->
+<!-- ====== 外部库 ====== -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@joergdietrich/leaflet.terminator@latest/L.Terminator.js"></script>
+
+<!-- ====== Firebase（留言板用） ====== -->
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 
 <script>
 (function () {
     'use strict';
 
+    /* ==========================================================
+       🔧 Firebase 配置 —— 请替换为你自己的（见 README 设置指南）
+       ========================================================== */
+    const firebaseConfig = {
+        apiKey: "AIzaSyBTMmPa5O4emGr69dEDDLTvd5lGM1-G_d0",
+        authDomain: "parisun-9c4e3.firebaseapp.com",
+        databaseURL: "https://parisun-9c4e3-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "parisun-9c4e3",
+        storageBucket: "parisun-9c4e3.firebasestorage.app",
+        messagingSenderId: "466204125540",
+        appId: "1:466204125540:web:4fd6514e06cf3346f8b271"
+        };
+
     /* ===== 1. 地图初始化 ===== */
+
     const map = L.map('map', {
-        center: [25, 50], zoom: 2,
+        center: [35, 60], zoom: 2,
         minZoom: 2, maxZoom: 12,
         worldCopyJump: true
     });
@@ -112,7 +234,7 @@
         { attribution: '© OpenStreetMap' }
     );
     imagery.addTo(map);
-    L.control.layers({ '🛰️ 卫星': imagery, '🗺️ 街道': osm }).addTo(map);
+    L.control.layers({ '🛰️ Satellite': imagery, '🗺️ Carte': osm }).addTo(map);
 
     /* ===== 2. 经纬网格 ===== */
     const gridOpt = { color: 'rgba(255,255,255,0.15)', weight: 0.5, interactive: false };
@@ -121,18 +243,27 @@
     for (let lng = -180; lng <= 180; lng += 60)
         L.polyline([[-85, lng], [85, lng]], gridOpt).addTo(map);
 
-    /* ===== 3. 城市标注 ===== */
-    const cities = [
-        { name: '巴黎 Paris',   lat: 48.8566, lng:   2.3522, tz: 'Europe/Paris'  },
-        { name: '南京 Nanjing',  lat: 32.0603, lng: 118.7969, tz: 'Asia/Shanghai' }
-    ];
-    cities.forEach(c => {
-        L.circleMarker([c.lat, c.lng], {
-            radius: 6, color: '#fff', weight: 2,
-            fillColor: '#e94560', fillOpacity: 1
-        }).addTo(map)
-         .bindPopup(`<b>${c.name}</b><br>${c.lat}°N, ${c.lng}°E`);
+    /* ===== 3. 城市标注（✅ 修复2: 动态颜色） ===== */
+    //  巴黎标点: 同一天 → 金黄 #FFD700 | 不同天 → 紫罗兰 #8A2BE2
+    //  南京标点: 永远爱马仕橙 #F37021
+    const HERMES_ORANGE = '#F37021';
+    const GOLD          = '#FFD700';
+    const VIOLET        = '#8A2BE2';
 
+    const parisMarker = L.circleMarker([48.8566, 2.3522], {
+        radius: 7, color: '#fff', weight: 2,
+        fillColor: GOLD, fillOpacity: 1
+    }).addTo(map).bindPopup('<b>巴黎 Paris</b><br>48.86°N, 2.35°E');
+
+    const nanjingMarker = L.circleMarker([32.0603, 118.7969], {
+        radius: 7, color: '#fff', weight: 2,
+        fillColor: HERMES_ORANGE, fillOpacity: 1
+    }).addTo(map).bindPopup('<b>南京 Nanjing</b><br>32.06°N, 118.80°E');
+
+    // 城市名标签
+    [{ name: '巴黎 Paris',  lat: 48.8566, lng: 2.3522 },
+     { name: '南京 Nanjing', lat: 32.0603, lng: 118.7969 }
+    ].forEach(c => {
         L.marker([c.lat, c.lng], {
             interactive: false,
             icon: L.divIcon({
@@ -140,23 +271,19 @@
                 html: `<span style="color:#fff;font-size:12px;font-weight:bold;
                         text-shadow:0 0 6px #000,0 0 3px #000;
                         white-space:nowrap">${c.name}</span>`,
-                iconAnchor: [-10, 12]
+                iconAnchor: [-12, 12]
             })
         }).addTo(map);
     });
 
     /* ===== 4. 昼夜阴影 ===== */
     let tLayer = null;
-
     function drawTerminator(date) {
         if (typeof L.terminator !== 'function') return;
         if (tLayer) map.removeLayer(tLayer);
         tLayer = L.terminator({
-            time: date,
-            fillOpacity: 0.42,
-            fillColor: '#000011',
-            color: '#ff8c00',
-            weight: 1.5
+            time: date, fillOpacity: 0.42,
+            fillColor: '#000011', color: '#ff8c00', weight: 1.5
         }).addTo(map);
     }
 
@@ -164,27 +291,45 @@
     const pad = n => String(n).padStart(2, '0');
 
     function fmtUTC(d) {
-        return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ` +
+        return `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())} ` +
                `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
     }
-
     function fmtTZ(d, tz) {
         try {
             return d.toLocaleString('zh-CN', {
                 timeZone: tz, hour12: false,
-                month: '2-digit', day: '2-digit',
+                year: 'numeric', month: '2-digit', day: '2-digit',
                 hour: '2-digit', minute: '2-digit', second: '2-digit'
             });
         } catch (e) { return '--'; }
     }
-
     function showTime(d) {
         document.getElementById('t-utc').textContent     = fmtUTC(d);
         document.getElementById('t-paris').textContent    = fmtTZ(d, 'Europe/Paris');
         document.getElementById('t-nanjing').textContent  = fmtTZ(d, 'Asia/Shanghai');
     }
 
-    /* ===== 6. 滑块交互 ===== */
+    /* ===== 6. 标点颜色更新 ===== */
+    const dayIndicator = document.getElementById('day-indicator');
+
+    function updateMarkerColors(date) {
+        // 比较巴黎和南京的日历日期
+        const parisDate   = date.toLocaleDateString('en-CA', { timeZone: 'Europe/Paris' });
+        const nanjingDate = date.toLocaleDateString('en-CA', { timeZone: 'Asia/Shanghai' });
+        const sameDay     = (parisDate === nanjingDate);
+
+        parisMarker.setStyle({ fillColor: sameDay ? GOLD : VIOLET });
+
+        if (sameDay) {
+            dayIndicator.textContent = '☀️ même jour · 同一天';
+            dayIndicator.className   = 'same-day';
+        } else {
+            dayIndicator.textContent = '🌙 jour différent · 不同天';
+            dayIndicator.className   = 'diff-day';
+        }
+    }
+
+    /* ===== 7. 滑块交互 ===== */
     const slider = document.getElementById('time-slider');
     const badge  = document.getElementById('badge');
     const status = document.getElementById('status');
@@ -192,22 +337,19 @@
 
     function goLive() {
         dragging = false;
-        badge.textContent = '● 实时';
-        badge.className   = 'badge badge-live';
-        status.textContent = '拖动滑块浏览当天各时刻 · 松开自动恢复实时';
+        badge.textContent  = '● 实时';
+        badge.className    = 'badge badge-live';
+        status.textContent = 'Faites glisser le curseur pour parcourir · 拖动滑块浏览当天各时刻';
         tick();
     }
 
-    // 开始拖动
     slider.addEventListener('mousedown',  () => { dragging = true; });
     slider.addEventListener('touchstart', () => { dragging = true; }, { passive: true });
 
-    // 拖动中
     slider.addEventListener('input', () => {
         dragging = true;
         badge.textContent = '⏸ 手动';
         badge.className   = 'badge badge-manual';
-
         const h   = parseInt(slider.value);
         const now = new Date();
         const sim = new Date(Date.UTC(
@@ -215,31 +357,133 @@
         ));
         drawTerminator(sim);
         showTime(sim);
-        status.textContent = `预览: UTC ${pad(h)}:00 — 松开恢复实时`;
+        updateMarkerColors(sim);
+        status.textContent = `Aperçu: UTC ${pad(h)}:00 — lâchez pour revenir en direct`;
     });
 
-    // 松开 → 恢复实时（挂在 document 上，防止滑出元素后丢失事件）
     document.addEventListener('mouseup',  () => { if (dragging) goLive(); });
     document.addEventListener('touchend', () => { if (dragging) goLive(); });
 
-    /* ===== 7. 定时刷新 ===== */
+    /* ===== 8. 定时刷新 ===== */
     function tick() {
         if (!dragging) {
             const now = new Date();
             drawTerminator(now);
             showTime(now);
+            updateMarkerColors(now);
             slider.value = now.getUTCHours();
         }
     }
+    tick();
+    setInterval(tick, 10000);
 
-    tick();                       // 首次渲染
-    setInterval(tick, 10000);     // 每 10 秒刷新
-
-    /* ===== 8. 插件加载检查 ===== */
+    /* ===== 9. 插件检查 ===== */
     if (typeof L.terminator !== 'function') {
         status.textContent = '⚠️ 昼夜阴影插件加载失败，请检查网络';
         status.style.color = '#e94560';
     }
+
+    /* ==========================================================
+       ✅ 修复3: 💌 留言板（Firebase Realtime Database）
+       ========================================================== */
+    const msgToggle = document.getElementById('msg-toggle');
+    const msgPanel  = document.getElementById('msg-panel');
+    const msgClose  = document.getElementById('msg-close');
+    const msgBody   = document.getElementById('msg-body');
+    const msgFooter = document.getElementById('msg-footer');
+    const msgHint   = document.getElementById('msg-hint');
+    const msgWho    = document.getElementById('msg-who');
+    const msgInput  = document.getElementById('msg-input');
+    const msgSend   = document.getElementById('msg-send');
+
+    // 面板开关
+    msgToggle.addEventListener('click', () => {
+        msgPanel.style.display = 'flex';
+        msgToggle.style.display = 'none';
+    });
+    msgClose.addEventListener('click', () => {
+        msgPanel.style.display = 'none';
+        msgToggle.style.display = 'block';
+    });
+
+    // 记住身份
+    const savedWho = localStorage.getItem('parisun-who');
+    if (savedWho) msgWho.value = savedWho;
+    msgWho.addEventListener('change', () => {
+        localStorage.setItem('parisun-who', msgWho.value);
+    });
+
+    // Firebase 初始化
+    const FB_OK = (typeof firebase !== 'undefined') &&
+                  (typeof firebase.database === 'function') &&
+                  !firebaseConfig.apiKey.startsWith('请替换');
+    let db = null;
+
+    if (FB_OK) {
+        try {
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.database();
+
+            // 实时监听留言更新
+            db.ref('status').on('value', snap => {
+                const data = snap.val() || {};
+                renderMsg('paris',   data.paris);
+                renderMsg('nanjing', data.nanjing);
+            });
+
+            msgBody.style.display   = 'block';
+            msgFooter.style.display = 'block';
+            msgHint.style.display   = 'none';
+        } catch (e) {
+            console.error('Firebase init failed:', e);
+            showHint();
+        }
+    } else {
+        showHint();
+    }
+
+    function showHint() {
+        msgBody.style.display   = 'none';
+        msgFooter.style.display = 'none';
+        msgHint.style.display   = 'block';
+    }
+
+    function renderMsg(city, data) {
+        const textEl = document.getElementById(city + '-msg');
+        const timeEl = document.getElementById(city + '-msg-time');
+        if (data && data.text) {
+            textEl.textContent = data.text;
+            if (data.time) {
+                const d = new Date(data.time);
+                const tz = city === 'paris' ? 'Europe/Paris' : 'Asia/Shanghai';
+                timeEl.textContent = d.toLocaleString('zh-CN', {
+                    timeZone: tz, hour12: false,
+                    month: '2-digit', day: '2-digit',
+                    hour: '2-digit', minute: '2-digit'
+                });
+            }
+        } else {
+            textEl.textContent = '暂无留言';
+            timeEl.textContent = '';
+        }
+    }
+
+    function sendMsg() {
+        if (!db) return;
+        const text = msgInput.value.trim();
+        if (!text) return;
+        const who = msgWho.value;
+        db.ref('status/' + who).set({
+            text: text,
+            time: firebase.database.ServerValue.TIMESTAMP
+        });
+        msgInput.value = '';
+    }
+
+    msgSend.addEventListener('click', sendMsg);
+    msgInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') sendMsg();
+    });
 
 })();
 </script>
