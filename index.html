@@ -70,6 +70,26 @@
         .msg-close { background: none; border: none; color: #666; font-size: 22px; cursor: pointer; line-height: 1; }
         .msg-close:hover { color: #e94560; }
         .msg-body { padding: 14px 16px; flex: 1; overflow-y: auto; }
+        /* ====== 滚动条美化 ====== */
+        .msg-body::-webkit-scrollbar {
+            width: 6px;
+        }
+        .msg-body::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .msg-body::-webkit-scrollbar-thumb {
+            background: rgba(233, 69, 96, 0.3);
+            border-radius: 3px;
+        }
+        .msg-body::-webkit-scrollbar-thumb:hover {
+            background: rgba(233, 69, 96, 0.6);
+        }
+
+/* Firefox */
+.msg-body {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(233, 69, 96, 0.3) transparent;
+}
         .msg-card { margin-bottom: 16px; }
         .msg-city { font-size: 12px; color: #888; margin-bottom: 3px; }
         .msg-text { font-size: 15px; color: #eee; line-height: 1.5; font-style: italic; }
