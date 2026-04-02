@@ -120,6 +120,34 @@
             #msg-toggle { bottom: 155px; }
             #msg-panel { bottom: 155px; }
         }
+        /* ====== 消息气泡 ====== */
+        .bubble {
+            max-width: 85%; padding: 8px 12px;
+            border-radius: 14px; font-size: 13px;
+            line-height: 1.5; word-break: break-word;
+            position: relative;
+        }
+        .bubble-paris {
+            align-self: flex-start;
+            background: rgba(255, 215, 0, 0.12);
+            border: 1px solid rgba(255, 215, 0, 0.2);
+            color: #ffe082;
+        }
+        .bubble-nanjing {
+            align-self: flex-end;
+            background: rgba(243, 112, 33, 0.12);
+            border: 1px solid rgba(243, 112, 33, 0.2);
+            color: #ffab76;
+        }
+        .bubble .b-who {
+            font-size: 10px; font-weight: bold;
+            margin-bottom: 2px; opacity: 0.7;
+        }
+        .bubble .b-text { font-style: italic; }
+        .bubble .b-time {
+            font-size: 10px; opacity: 0.45;
+            text-align: right; margin-top: 4px;
+        }
     </style>
 </head>
 <body>
@@ -129,25 +157,24 @@
 <!-- ====== 留言板按钮 ====== -->
 <button id="msg-toggle">🔞</button>
 
-<!-- ====== 留言板面板 ====== -->
+<!-- ====== 留言板面板（历史版） ====== -->
 <div id="msg-panel">
     <div class="msg-header">
         <span>此刻 · en ce moment</span>
         <button class="msg-close" id="msg-close">×</button>
     </div>
-    <div class="msg-body" id="msg-body">
-        <div class="msg-card">
-            <div class="msg-city">🗼 巴黎 Paris</div>
-            <div class="msg-text" id="paris-msg">暂无留言</div>
-            <div class="msg-time" id="paris-msg-time"></div>
+
+    <!-- 消息列表（可滚动） -->
+    <div class="msg-body" id="msg-body"
+         style="max-height:280px; overflow-y:auto; padding:10px 16px;">
+        <div id="msg-list" style="display:flex; flex-direction:column; gap:10px;">
+            <!-- 消息会动态插入这里 -->
         </div>
-        <hr class="msg-divider">
-        <div class="msg-card" style="margin-top:14px">
-            <div class="msg-city">🏯 南京 Nanjing</div>
-            <div class="msg-text" id="nanjing-msg">暂无留言</div>
-            <div class="msg-time" id="nanjing-msg-time"></div>
+        <div id="msg-empty" style="text-align:center; color:#555; padding:30px 0; font-size:13px;">
+            还没有留言，写下第一条吧 ✨
         </div>
     </div>
+
     <div class="msg-footer" id="msg-footer">
         <select id="msg-who">
             <option value="paris">🗼 我在巴黎</option>
@@ -161,8 +188,7 @@
     <div class="msg-hint-box" id="msg-hint" style="display:none">
         ⚠️ 留言板需配置 Firebase<br>
         打开 <code>index.html</code> 搜索<br>
-        <code>firebaseConfig</code> 并替换配置<br>
-        <small style="color:#555">详见 README</small>
+        <code>firebaseConfig</code> 并替换配置
     </div>
 </div>
 
@@ -383,26 +409,30 @@
         status.style.color = '#e94560';
     }
 
-    /* ==========================================================
-       ✅ 修复3: 💌 留言板（Firebase Realtime Database）
+      /* ==========================================================
+       💌 留言板（历史版 —— Firebase Realtime Database）
        ========================================================== */
     const msgToggle = document.getElementById('msg-toggle');
     const msgPanel  = document.getElementById('msg-panel');
     const msgClose  = document.getElementById('msg-close');
-    const msgBody   = document.getElementById('msg-body');
+    const msgList   = document.getElementById('msg-list');
+    const msgEmpty  = document.getElementById('msg-empty');
     const msgFooter = document.getElementById('msg-footer');
     const msgHint   = document.getElementById('msg-hint');
     const msgWho    = document.getElementById('msg-who');
     const msgInput  = document.getElementById('msg-input');
     const msgSend   = document.getElementById('msg-send');
+    const msgBody   = document.getElementById('msg-body');
 
     // 面板开关
     msgToggle.addEventListener('click', () => {
-        msgPanel.style.display = 'flex';
+        msgPanel.style.display  = 'flex';
         msgToggle.style.display = 'none';
+        // 滚到底部
+        setTimeout(() => { msgBody.scrollTop = msgBody.scrollHeight; }, 100);
     });
     msgClose.addEventListener('click', () => {
-        msgPanel.style.display = 'none';
+        msgPanel.style.display  = 'none';
         msgToggle.style.display = 'block';
     });
 
@@ -424,14 +454,27 @@
             firebase.initializeApp(firebaseConfig);
             db = firebase.database();
 
-            // 实时监听留言更新
-            db.ref('status').on('value', snap => {
-                const data = snap.val() || {};
-                renderMsg('paris',   data.paris);
-                renderMsg('nanjing', data.nanjing);
-            });
+            // ✅ 关键改动：监听 messages 列表，最多取最近 50 条
+            db.ref('messages')
+              .orderByChild('time')
+              .limitToLast(50)
+              .on('value', snap => {
+                  msgList.innerHTML = '';
+                  const data = snap.val();
+                  if (!data) {
+                      msgEmpty.style.display = 'block';
+                      return;
+                  }
+                  msgEmpty.style.display = 'none';
 
-            msgBody.style.display   = 'block';
+                  // 按时间排序
+                  const items = Object.values(data).sort((a, b) => a.time - b.time);
+                  items.forEach(renderBubble);
+
+                  // 自动滚到底部
+                  setTimeout(() => { msgBody.scrollTop = msgBody.scrollHeight; }, 50);
+              });
+
             msgFooter.style.display = 'block';
             msgHint.style.display   = 'none';
         } catch (e) {
@@ -443,40 +486,55 @@
     }
 
     function showHint() {
-        msgBody.style.display   = 'none';
         msgFooter.style.display = 'none';
         msgHint.style.display   = 'block';
     }
 
-    function renderMsg(city, data) {
-        const textEl = document.getElementById(city + '-msg');
-        const timeEl = document.getElementById(city + '-msg-time');
-        if (data && data.text) {
-            textEl.textContent = data.text;
-            if (data.time) {
-                const d = new Date(data.time);
-                const tz = city === 'paris' ? 'Europe/Paris' : 'Asia/Shanghai';
-                timeEl.textContent = d.toLocaleString('zh-CN', {
-                    timeZone: tz, hour12: false,
-                    month: '2-digit', day: '2-digit',
-                    hour: '2-digit', minute: '2-digit'
-                });
-            }
-        } else {
-            textEl.textContent = '暂无留言';
-            timeEl.textContent = '';
+    function renderBubble(item) {
+        const div = document.createElement('div');
+        div.className = 'bubble bubble-' + item.who;
+
+        const label = item.who === 'paris' ? '🗼 巴黎' : '🏯 南京';
+        const tz    = item.who === 'paris' ? 'Europe/Paris' : 'Asia/Shanghai';
+
+        let timeStr = '';
+        if (item.time) {
+            const d = new Date(item.time);
+            timeStr = d.toLocaleString('zh-CN', {
+                timeZone: tz, hour12: false,
+                month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit'
+            });
         }
+
+        div.innerHTML = `
+            <div class="b-who">${label}</div>
+            <div class="b-text">${escapeHtml(item.text)}</div>
+            <div class="b-time">${timeStr}</div>
+        `;
+        msgList.appendChild(div);
     }
 
+    // 防 XSS
+    function escapeHtml(str) {
+        const d = document.createElement('div');
+        d.textContent = str;
+        return d.innerHTML;
+    }
+
+    // ✅ 关键改动：用 push() 而不是 set()，每条留言是新记录
     function sendMsg() {
         if (!db) return;
         const text = msgInput.value.trim();
         if (!text) return;
         const who = msgWho.value;
-        db.ref('status/' + who).set({
+
+        db.ref('messages').push({
+            who:  who,
             text: text,
             time: firebase.database.ServerValue.TIMESTAMP
         });
+
         msgInput.value = '';
     }
 
@@ -484,6 +542,8 @@
     msgInput.addEventListener('keydown', e => {
         if (e.key === 'Enter') sendMsg();
     });
+
+
 
 })();
 </script>
