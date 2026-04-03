@@ -168,10 +168,121 @@
             font-size: 10px; opacity: 0.45;
             text-align: right; margin-top: 4px;
         }
+    /* ====== 🔐 问答登录蒙版 ====== */
+        #login-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(135deg, #0a0a1a 0%, #1a1a3e 50%, #0f0f2a 100%);
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        #login-overlay.hidden {
+            display: none;
+        }
+        .login-box {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 24px;
+            padding: 40px 50px;
+            text-align: center;
+            backdrop-filter: blur(20px);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+            max-width: 90vw;
+        }
+        .login-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+        .login-box h2 {
+            color: #fff;
+            font-size: 28px;
+            font-weight: 300;
+            letter-spacing: 3px;
+            margin-bottom: 20px;
+        }
+        .login-question {
+            color: #e94560;
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+        .login-box input {
+            width: 240px;
+            padding: 14px 20px;
+            font-size: 16px;
+            text-align: center;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 12px;
+            color: #fff;
+            outline: none;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+        .login-box input:focus {
+            border-color: #e94560;
+            box-shadow: 0 0 20px rgba(233,69,96,0.2);
+        }
+        .login-box input::placeholder {
+            color: #555;
+        }
+        .login-box button {
+            display: block;
+            width: 240px;
+            margin: 20px auto 0;
+            padding: 12px 0;
+            font-size: 15px;
+            font-weight: bold;
+            color: #fff;
+            background: linear-gradient(135deg, #e94560, #c73659);
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .login-box button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(233,69,96,0.4);
+        }
+        .login-error {
+            color: #e94560;
+            font-size: 13px;
+            margin-top: 16px;
+            min-height: 20px;
+        }
+        .login-hint {
+            color: #444;
+            font-size: 11px;
+            margin-top: 12px;
+            font-style: italic;
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-8px); }
+            40%, 80% { transform: translateX(8px); }
+        }
+        @keyframes fadeOut {
+            to { opacity: 0; transform: scale(1.1); }
+        }
+        #login-overlay.success {
+            animation: fadeOut 0.5s ease forwards;
+        }
     </style>
 </head>
 <body>
 
+<div id="login-overlay">
+    <div class="login-box">
+        <div class="login-icon">🌅</div>
+        <h2>Parîsun</h2>
+        <p class="login-question">mxj 不喜欢吃什么？</p>
+        <input type="text" id="login-pwd" placeholder="随便说一个..." maxlength="30" autofocus>
+        <button id="login-btn">Entrer</button>
+        <p class="login-error" id="login-error"></p>
+        <p class="login-hint">Indice: il y a beaucoup de réponses~</p>
+    </div>
+</div>
 <div id="map"></div>
 
 <!-- ====== 留言板按钮 ====== -->
@@ -562,7 +673,92 @@
     msgInput.addEventListener('keydown', e => {
         if (e.key === 'Enter') sendMsg();
     });
+        /* ==========================================================
+       🔐 问答登录 —— mxj 不喜欢吃什么
+       ========================================================== */
+    const ANSWERS = [
+        // 水果类
+        '香蕉', '草莓', '凤梨', '菠萝', '榴莲', '菠萝蜜',
+        // 饮料/调料
+        '碳酸饮料', '汽水', '可乐', '雪碧', '黄酒', '香草',
+        // 肉类加工
+        '腊肉', '咸肉', '腊肠', '香肠', '烤肠', '内脏',
+        // 零食干货
+        '牛肉干', '葡萄干', '话梅', '辣味卤味', '卤味零食',
+        // 小吃类
+        '年糕', '丸子', '牛肉丸', '洋葱圈', '鱿鱼圈',
+        // 甜品/配料
+        '芋泥', '西米', '酒心巧克力', '色拉', '沙拉',
+        // 蔬菜
+        '胡萝卜', '红萝卜', '萝卜',
+        // 菜品
+        '银鱼跑蛋', '香辣龙虾',
+        // 彩蛋
+        '呼啦圈'
+    ];
 
+    const overlay    = document.getElementById('login-overlay');
+    const pwdInput   = document.getElementById('login-pwd');
+    const loginBtn   = document.getElementById('login-btn');
+    const loginError = document.getElementById('login-error');
+
+    // 标准化输入（去空格、转小写、去除emoji）
+    function normalize(str) {
+        return str.trim()
+                  .toLowerCase()
+                  .replace(/[\s\uFE00-\uFE0F\u200D]/g, '')  // 去空格和变体选择符
+                  .replace(/[\u{1F300}-\u{1FAF8}]/gu, '');  // 去emoji
+    }
+
+    // 检查答案是否匹配
+    function checkAnswer(input) {
+        const userInput = normalize(input);
+        if (!userInput) return false;
+        
+        return ANSWERS.some(ans => {
+            const normalAns = normalize(ans);
+            // 完全匹配 或 包含匹配（用户输入包含答案，或答案包含用户输入）
+            return normalAns === userInput || 
+                   normalAns.includes(userInput) || 
+                   userInput.includes(normalAns);
+        });
+    }
+
+    function tryLogin() {
+        const val = pwdInput.value.trim();
+        if (!val) {
+            loginError.textContent = '说点什么嘛~';
+            return;
+        }
+        
+        if (checkAnswer(val)) {
+            // 答对了！
+            loginError.style.color = '#4CAF50';
+            loginError.textContent = '✓ 没错！mxj 确实不喜欢 ' + val;
+            overlay.classList.add('success');
+            setTimeout(() => {
+                overlay.classList.add('hidden');
+            }, 800);
+        } else {
+            // 答错了
+            loginError.style.color = '#e94560';
+            loginError.textContent = '不对哦，再想想~';
+            pwdInput.value = '';
+            pwdInput.focus();
+            // 抖动效果
+            pwdInput.style.animation = 'none';
+            pwdInput.offsetHeight;
+            pwdInput.style.animation = 'shake 0.4s ease';
+        }
+    }
+
+    loginBtn.addEventListener('click', tryLogin);
+    pwdInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') tryLogin();
+        if (loginError.style.color === 'rgb(233, 69, 96)') {
+            loginError.textContent = '';
+        }
+    });
 
 
 })();
